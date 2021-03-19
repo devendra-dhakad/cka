@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    run: pod
+  name: pod2
+spec:
+  nodeSelector:
+    region: "IN"
+  containers:
+    - image: httpd
+      name: pod2

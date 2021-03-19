@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: "rs1"
+
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      env: prod
+    matchExpressions:
+      - { key: team, operator: In, values: [ team1, team2 ] }
+      - { key: tier, operator: In, values: [ frontend ]  }
+
+  template:
+    metadata:
+      name: "t1"
+      labels:
+        tier: frontend
+        team: team1
+        env: prod
+    spec:
+      containers:
+        - name: "c1"
+          image: "devendra618/httpd:v2"
+

@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Pod
+metadata:
+        name: "p4"
+        labels:
+                app: backend
+                region: AZ
+                env: prod
+                team: team2
+spec:
+        containers:
+                - name: "c2"
+                  image: "devendra618/httpd:v2"
+
+

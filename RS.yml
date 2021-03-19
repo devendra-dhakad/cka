@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: "rs1"
+
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: frontend
+
+  template:
+    metadata:
+      name: "t1"
+      labels:
+        app: frontend
+        region: IN
+        team: team2
+        env: prod
+    spec:
+      containers:
+        - name: c1
+          image: "devendra618/httpd:v2"
+
+

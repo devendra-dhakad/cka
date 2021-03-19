@@ -1,0 +1,212 @@
+master setup:
+sudo su - root
+yum install docker -y
+systemctl enable docker --now
+
+vi /etc/yum.repos.d/kubernetes.repo
+
+[kubernetes]
+name=Kubernetes
+baseurl=https://packages.cloud.google.com/yum/repos/kubernetes-el7-x86_64
+enabled=1
+gpgcheck=1
+repo_gpgcheck=1
+gpgkey=https://packages.cloud.google.com/yum/doc/yum-key.gpg https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
+exclude=kubelet kubeadm kubectl
+
+yum install kubeadm -y
+systemctl status kubelet
+systemctl enable kubelet --now
+kubeadm config images pull
+
+
+kubeadm init Errors
+1:-CgroupDriver
+vi /etc/docker/daemon.json
+{
+ "exec-opts": ["native.cgroupdriver=systemd"]
+}
+
+systemctl restart docker
+2:-tc not found in system path
+yum install iproute-tc -y
+
+3:-FileContent--proc-sys-net-bridge-bridge-nf-call-iptables
+vi /etc/sysctl.d/k8s.conf
+net.bridge.bridge-nf-call-ip6tables = 1
+net.bridge.bridge-nf-call-iptables = 1
+sysctl --system
+
+
+4:-kubectl conf local
+  mkdir -p $HOME/.kube
+  sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+  sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+kubeadm init --apiserver-cert-extra-sans=65.0.26.159 --pod-network-cidr=10.240.0.0/16 --ignore-preflight-errors=NumCPU  --ignore-preflight-errors=Mem
+
+
+
+
+
+
+worker node:
+yum install docker -y
+
+vi /etc/yum.repos.d/kubernetes.repo
+
+[kubernetes]
+name=Kubernetes
+baseurl=https://packages.cloud.google.com/yum/repos/kubernetes-el7-x86_64
+enabled=1
+gpgcheck=1
+repo_gpgcheck=1
+gpgkey=https://packages.cloud.google.com/yum/doc/yum-key.gpg https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
+
+yum install kubeadm -y
+
+systemctl enable docker --now
+systemctl enable kubelet --now
+on master: (kubeadm token create --print-join-command)
+0n worker: kubeadm join 172.31.14.198:6443 --token 9epizi.uzxgfustgpvvd3cb     --discovery-token-ca-cert-hash sha256:e7cbe8100770f62956058e1a9894e811cb4731d913d230c972c10a32e93febaf 
+
+:>1 CgroupDriver
+vi /etc/docker/daemon.json
+{
+ "exec-opts": ["native.cgroupdriver=systemd"]
+}
+systemctl restart docker
+
+2:> tc not found in system path
+yum install iproute-tc -y
+
+3:-FileContent--proc-sys-net-bridge-bridge-nf-call-iptables
+vi /etc/sysctl.d/k8s.conf
+net.bridge.bridge-nf-call-ip6tables = 1
+net.bridge.bridge-nf-call-iptables = 1
+
+sysctl --system
+on master node:not ready nodes:for cni
+kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
+
+
+
+
+brige on node:
+brctl show
+kubectl get pod -n kube-system -o wide
+
+edit flanel range:-
+kubectl edit cm kube-flannel-cfg -n kube-system
+kubectl delete pod -l app=flannel -n kube-system
+cat var/run/flannel/subnet.env
+
+
+remote kubectl setup:
+openssl genrsa -out private.key 1024
+openssl req -new -key private.key -out devendra.csr
+ openssl x509 -req -in devendra.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out devendra.crt
+ kubectl cluster-info
+ kubectl config set-cluster awskubecluster --kubeconfig devendra.kubeconfig --server=https://13.127.143.240:6443 --certificate-authority=ca.crt
+kubectl config set-credentials devendra --kubeconfig devendra.kubeconfig --client-certificate devendra.crt --client-key private.key
+ kubectl config view --kubeconfig devendra.kubeconfig
+kubectl config set-context devendra@awskubecluster --kubeconfig devendra.kubeconfig --cluster=awskubecluster --user=devendra
+kubectl config use-context devendra@awskubecluster --kubeconfig devendra.kubeconfig
+kubectl config current-context devendra@awskubecluster --kubeconfig devendra.kubeconfig
+
+ add public Ip to kubeapi-server:
+ openssl x509 -in apiserver.crt -text
+ kubeadm init phase certs all --apiserver-advertise-address=0.0.0.0 --apiserver-cert-extra-sans=13.127.143.240
+ docker rm -f `docker ps -q -f 'name=k8s_kube-apiserver*'`
+kubectl get pod --kubeconfig devendra.kubeconfig -n tech
+kubectl get roles -n tech
+kubectl create role devendra-tech resource=pods --verb=get,list -n tech
+kubectl create rolebinding devendra-tech-rb --role=devendra-tech --user=devendra -n tech
+kubectl edit role devendra-tech -n tech
+api-server:-
+ curl --cacert ca.crt https://172.31.3.42:6443
+curl --cacert ca.crt https://172.31.3.42:6443/version
+
+cat admin.crt | base64 -d > admin_c.crt
+cat admin.key | base64 -d > admin_k.key
+
+sudo cp admin_c.crt /etc/kubernetes/pki/
+sudo cp admin_k.key /etc/kubernetes/pki/
+
+curl https://172.31.3.42:6443 --cacert ca.crt --cert admin_c.crt --key admin_k.key
+curl https://172.31.3.42:6443/api/v1 --cacert ca.crt --cert admin_c.crt --key admin_k.key | grep kind
+
+
+kubectl config set-context [NAME | --current] [--cluster=cluster_nickname] [--user=user_nickname]
+[--namespace=namespace]
+
+cluster role:
+openssl genrsa -out private.key 1024
+openssl req -new -key private.key -out devendra.csr "/CN=sadmin/O=storage"
+subject=/C=IN/ST=MP/L=shivpuri/O=rjit/OU=storage/CN=sadmin/emailAddress=devendradhakad618@gmail.com
+
+openssl req -new -key sadmin.key -out sadmin.csr
+openssl x509 -req -in sadmin.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out sadmin.crt -days 365
+
+
+cat sadmin.crt | base64
+kubectl get pv --kubeconfig sadmin.kubeconfig
+kubectl api-resources  --kubeconfig sadmin.kubeconfig
+kubectl create clusterrole mysadminrole --verb=get,list,watch,create --resource=pv
+kubectl create clusterrolebinding admin --clusterrole=cluster-admin --user=sadmin
+
+
+taint:-
+kubectl describe  node ip-172-31-3-42.ap-south-1.compute.internal
+kubectl explain pod
+kubectl label node ip-172-31-12-6.ap-south-1.compute.internal region=india ram=16
+kubectl get node ip-172-31-12-6.ap-south-1.compute.internal --show-labels
+kubectl run pod myp --image=httpd --dry-run=client -o yaml > a.yaml
+kubectl taint node ip-172-31-0-208.ap-south-1.compute.internal mytype=vryimp:NoSchedule
+
+- effect: NoSchedule
+    key: mytype
+    value: vryimp
+    operator: Equal
+    
+untaint node:
+kubectl taint node ip-172-31-3-42.ap-south-1.compute.internal node-role.kubernetes.io/master:NoSchedule- //(-)
+kubectl taint node ip-172-31-12-6.ap-south-1.compute.internal a=b:NoExecute
+
+static pod:-
+
+kubelet status kubelet
+cat /var/lib/kubelet/config.yaml
+cd /etc/kubernetes/manifests
+vi p1
+ kubectl get DaemonSet
+
+helm:
+curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3
+chmod 700 get_helm.sh
+./helm
+
+helm list
+helm install myweb myweb/
+helm upgrade myweb myweb/
+helm rollback myweb 1
+helm history myweb
+helm show values myweb/
+helm search hub woedpress
+
+
+cm:-
+vi web.conf
+kubectl create cm mywebconf --from-file=web.conf
+core dns:-
+
+
+ingress:-
+minikube addons enable ingress
+kubectl apply -f ingress.yaml
+network policy:-
+kubectl create depolyment myd --replicas=5 --image=httpd
+kubectl expose deploy --port=80 --type=NodePort
+ 
+
+
